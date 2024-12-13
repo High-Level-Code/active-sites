@@ -38,6 +38,8 @@ cron.schedule("*/10 * * * *", () => {
     job.cronTask!.stop();
     job.cronTask = null;
     installedCronjobs.splice(index, 1);
+    console.log(`> [LOG] Removed cronjob with id ${job.id}. Cronjob details:`);
+    console.log(`${JSON.stringify(job)}\n`);
   });
 
   let areNewOrUpdated: boolean = true;
@@ -53,7 +55,7 @@ cron.schedule("*/10 * * * *", () => {
     async function task() {
       try {
         const secret = process.env.CRONJOB_SECRET;
-        if (!secret) return console.log(`> [ERROR] No secret was provided for authorization.`);
+        if (!secret) return console.log(`> [ERROR] No secret was provided for authorization.\n`);
         const req = await fetch(endpoint, {
           headers: {
             "Authorization": `Bearer ${secret}`,
@@ -62,14 +64,15 @@ cron.schedule("*/10 * * * *", () => {
         });
         const res = await req.json();
 
-        console.log(`> [LOG] A request to ${endpoint} was made.`);
+        console.log(`> [CRONJOB - ${id}] A request to ${endpoint} was made.`);
         console.log(` status: ${req.status}`);
         console.log(` body: ${JSON.stringify(res)}`);
-        console.log(` cronjob details: ${JSON.stringify({id, endpoint, recurrence})}`);
+        console.log(` cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n`);
 
       } catch (error) {
-        console.error(`> [ERROR] A request to ${endpoint} failed [${new Date()}]. Error:`);
-        console.error(` ${error}`);
+        console.error(`> [CRONJOB ERROR] A request to ${endpoint} failed [${new Date()}]. Error:`);
+        console.error(` ${error}\n`);
+        // send a message to client's email
       }
     }
 
@@ -84,8 +87,8 @@ cron.schedule("*/10 * * * *", () => {
 
       installedCronjobs.push(newCron);
       
-      console.log(`> [LOG] cronjob with id ${id} was successfully installed [${new Date()}]`);
-      console.log(newCron);
+      console.log(`> [LOG] cronjob with id ${id} was successfully installed - at ${new Date()} - Details:`);
+      console.log(JSON.stringify(newCron), "\n");
       areNewOrUpdated = true;
       return;
     }
@@ -96,7 +99,7 @@ cron.schedule("*/10 * * * *", () => {
     ) {
       console.log(`> [LOG] cronjob with id ${id} is being updated [${new Date()}]:`);
       console.log(` endpoint: ${installedCron.endpoint} -> ${endpoint}`);
-      console.log(` recurrence: ${installedCron.recurrence} -> ${recurrence}`);
+      console.log(` recurrence: ${installedCron.recurrence} -> ${recurrence}\n`);
 
       installedCron.cronTask!.stop();
       installedCron.cronTask = null;
