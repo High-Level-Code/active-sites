@@ -1,4 +1,7 @@
+import * as dotenv from "dotenv";
 import cron, { ScheduledTask } from "node-cron";
+
+dotenv.config();
 
 interface DBCronjob {
   id: string,
@@ -26,6 +29,17 @@ const installedCronjobs: Cronjob[] = [];
 cron.schedule("*/10 * * * *", () => {
   console.log(`> [LOG] Pulling endpoints from database ...`);
 
+  // remove not listed cronjobs in the database
+  installedCronjobs.forEach((job: Cronjob, index) => {
+
+    const inDB = supabase.find((x) => x.id === job.id);
+    if (inDB) return;
+
+    job.cronTask!.stop();
+    job.cronTask = null;
+    installedCronjobs.splice(index, 1);
+  });
+
   let areNewOrUpdated: boolean = true;
   supabase.forEach((data: DBCronjob) => {
     // validate data
@@ -38,19 +52,24 @@ cron.schedule("*/10 * * * *", () => {
 
     async function task() {
       try {
-        // const req = await fetch(endpoint);
-        // const res = await req.json();
+        const secret = process.env.CRONJOB_SECRET;
+        if (!secret) return console.log(`> [ERROR] No secret was provided for authorization.`);
+        const req = await fetch(endpoint, {
+          headers: {
+            "Authorization": `Bearer ${secret}`,
+          },
+          method: "POST"
+        });
+        const res = await req.json();
 
-        console.log(`> [LOG] Simulating a request to ${endpoint}. [${new Date()}]`);
-        // console.log(`> [LOG] A request to ${endpoint} was made.`);
-        // console.log(` status: ${req.status}`);
-        // console.log(` body: ${JSON.stringify(res)}`);
+        console.log(`> [LOG] A request to ${endpoint} was made.`);
+        console.log(` status: ${req.status}`);
+        console.log(` body: ${JSON.stringify(res)}`);
         console.log(` cronjob details: ${JSON.stringify({id, endpoint, recurrence})}`);
 
       } catch (error) {
-        console.log(`> [LOG] A request to ${endpoint} failed [${new Date()}]. Error:`);
-        console.log(` ${error}`);
-        console.error(error);
+        console.error(`> [ERROR] A request to ${endpoint} failed [${new Date()}]. Error:`);
+        console.error(` ${error}`);
       }
     }
 
@@ -68,6 +87,7 @@ cron.schedule("*/10 * * * *", () => {
       console.log(`> [LOG] cronjob with id ${id} was successfully installed [${new Date()}]`);
       console.log(newCron);
       areNewOrUpdated = true;
+      return;
     }
 
     if (installedCron && (
@@ -88,9 +108,13 @@ cron.schedule("*/10 * * * *", () => {
     }
     
     areNewOrUpdated = false;
+    return;
   });
   if (!areNewOrUpdated) return console.log(`\n> [LOG] No new or updated cronjobs.\n`);
 
   console.log(`> [LOG] Cronjobs installed [${new Date()}]:`);
-  console.log(installedCronjobs);
-})
+  installedCronjobs.forEach((job: Cronjob) => {
+    console.log(JSON.stringify(job));
+  });
+  console.log("\n")
+});
