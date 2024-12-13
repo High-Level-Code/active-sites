@@ -1,5 +1,6 @@
 import * as dotenv from "dotenv";
 import cron, { ScheduledTask } from "node-cron";
+import prisma from "./prisma/prisma";
 
 dotenv.config();
 
@@ -8,6 +9,8 @@ interface DBCronjob {
   website: string,
   apiEndpoint: string,
   recurrence: string,
+  createdAt: Date,
+  updatedAt: Date
 };
 
 interface Cronjob {
@@ -17,12 +20,17 @@ interface Cronjob {
   cronTask: ScheduledTask | null;
 }
 
+async function getActiveSites() {
+  try {
+    return await prisma.activeSites.findMany();
+  } catch (error) {
+    console.error(`> [DATABASE ERROR] Details:`);
+    console.error(` ${error}\n`)
+  }
+}
 
-const supabase = [
-  {id: "cm4kzf0xk0000uzjkp57vk5qn", website: "https://routes-testing-gold.vercel.app", apiEndpoint: "api/1", recurrence: "*/4 * * * *"},
-  {id: "cm4kzf0xn0001uzjkiv8ofl7b", website: "https://routes-testing-gold.vercel.app", apiEndpoint: "api/2", recurrence: "*/5 * * * *"},
-  {id: "cm4kzf0xn0002uzjk80sfcx4s", website: "https://routes-testing-gold.vercel.app", apiEndpoint: "api/3", recurrence: "*/6 * * * *"},
-]
+
+const supabase = await getActiveSites() || [];
 
 const installedCronjobs: Cronjob[] = [];
 
@@ -113,6 +121,7 @@ cron.schedule("*/10 * * * *", () => {
     areNewOrUpdated = false;
     return;
   });
+
   if (!areNewOrUpdated) return console.log(`\n> [LOG] No new or updated cronjobs.\n`);
 
   console.log(`> [LOG] Cronjobs installed [${new Date()}]:`);
