@@ -3,10 +3,12 @@
     "@prisma/client": "^6.0.1",
     "dotenv": "^16.4.7",
     "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.16",
     "prisma": "^6.0.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
-    "@types/node-cron": "^3.0.11"
+    "@types/node-cron": "^3.0.11",
+    "@types/nodemailer": "^6.4.17"
   }
 }
