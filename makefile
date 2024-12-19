@@ -8,3 +8,6 @@ docker-run:
 
 docker:
 	make docker-build && make docker-run
+
+docker-exec:
+	docker exec -it url-cron bash
