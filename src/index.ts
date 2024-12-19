@@ -1,46 +1,23 @@
-import * as dotenv from "dotenv";
-import cron, { ScheduledTask } from "node-cron";
-import prisma from "./prisma/prisma";
+import cron from "node-cron";
 import fs from "node:fs";
-
-dotenv.config();
-
-interface DBCronjob {
-  id: string,
-  website: string,
-  apiEndpoint: string,
-  recurrence: string,
-  createdAt: Date,
-  updatedAt: Date
-};
-
-interface Cronjob {
-  id: string,
-  endpoint: string,
-  recurrence: string,
-  cronTask?: ScheduledTask | null;
-}
-
-async function getActiveSites() {
-  try {
-    const data = await prisma.activeSites.findMany();
-    data && console.log(`> [LOG] Endpoints pulled.`);
-    data && data.forEach((x) => {
-      console.log(JSON.stringify(x));
-    })
-    console.log("\n")
-    return data;
-  } catch (error) {
-    console.error(`> [DATABASE ERROR] Details:`);
-    console.error(` ${error}\n`)
-    throw new Error(error);
-  }
-}
+import { Cronjob, DBCronjob } from "./modules/cronjob/types";
+import { sendAlertEmail } from "./modules/email";
+import { CRONJOB_SECRET, EMAIL_ADDRESS, MAIN_SCHEDULE } from "./config";
+import { getActiveSites } from "./modules/activeSites/queries";
 
 
 const installedCronjobs: Cronjob[] = [];
 
-cron.schedule("*/4 * * * *", async () => {
+if (!MAIN_SCHEDULE) {
+  console.error("> [ERROR] No schdule provided.");
+  process.exit(1);
+}
+if (!cron.validate(MAIN_SCHEDULE)) {
+  console.error("> [ERROR] Schedule provided is invalid.");
+  process.exit(1);
+}
+
+cron.schedule(`${MAIN_SCHEDULE}`, async () => {
   console.log(">> Executing main cronjob ..");
   console.log(`> [LOG] Pulling endpoints from database ...`);
   const supabase = await getActiveSites() || [];
@@ -92,10 +69,14 @@ cron.schedule("*/4 * * * *", async () => {
     const installedCron = installedCronjobs.find((x) => x.id === id);
 
     async function task() {
-      try {
-        const secret = process.env.CRONJOB_SECRET;
-        if (!secret) return console.log(`> [ERROR] No secret was provided for authorization.\n`);
 
+      const logPath = `url-logs/${id}.txt`;
+
+      const secret = CRONJOB_SECRET;
+      if (!secret) return fs.appendFileSync(logPath,`> [ERROR] No secret was provided for authorization.\n`);
+
+
+      try {
         const req = await fetch(endpoint, {
           headers: {
             "Authorization": `Bearer ${secret}`,
@@ -104,34 +85,25 @@ cron.schedule("*/4 * * * *", async () => {
         });
         const res = await req.json();
 
-        /**
-        console.log(`> [CRONJOB - ${id}] A request to ${endpoint} was made.`);
-        console.log(` at: ${new Date()}`);
-        console.log(` status: ${req.status}`);
-        console.log(` body: ${JSON.stringify(res)}`);
-        console.log(` cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n`);
-        **/
-
-        fs.appendFileSync(`url-logs/${id}.txt`, `
-          > [CRONJOB - ${id}] A request to ${endpoint} was made.
+        const text = `> [CRONJOB - ${id}] A request to ${endpoint} was made.
             at: ${new Date()}
             status: ${req.status}
             body: ${JSON.stringify(res)}
-            cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n
-        `);
+            cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n`;
+
+        fs.appendFileSync(logPath, text);
+        if (!req.ok) sendAlertEmail(EMAIL_ADDRESS!, text, logPath);
 
       } catch (error) {
-        /**
-        console.error(`> [CRONJOB ERROR] A request to ${endpoint} failed [${new Date()}]. Error:`);
-        console.error(` ${error}\n`);
-        **/
 
-        fs.appendFileSync(`url-logs/${id}.txt`, `
-          > [CRONJOB ERROR] A request to ${endpoint} failed [${new Date()}]. Error:
+        const text = `
+          > [CRONJOB ERROR] A request to ${endpoint} failed [${new Date()}]. Error details:
             ${error}\n
-        `);
-        // send a message to client's email
+        `;
+        fs.appendFileSync(logPath, text);
+        sendAlertEmail(EMAIL_ADDRESS!, text, logPath);
       }
+
     }
 
     if (!installedCron) {

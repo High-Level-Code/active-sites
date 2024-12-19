@@ -11,10 +11,10 @@ RUN npm install
 RUN npm install -g tsx
 
 COPY prisma/ ./prisma/
-COPY index.ts ./
+COPY src/ ./src/
 
 RUN npx prisma generate
 RUN touch logs.txt
 RUN mkdir url-logs
 
-CMD tsx index.ts >> logs.txt 2>&1 
+CMD tsx src/index.ts >> logs.txt 2>&1
