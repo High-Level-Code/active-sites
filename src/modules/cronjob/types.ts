@@ -5,8 +5,7 @@ export interface DBCronjob {
   website: string,
   apiEndpoint: string,
   recurrence: string,
-  createdAt: Date,
-  updatedAt: Date
+  created_at: Date,
 };
 
 export interface Cronjob {

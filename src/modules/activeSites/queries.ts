@@ -4,7 +4,11 @@ import { EMAIL_ADDRESS } from "../../config";
 
 export async function getActiveSites() {
   try {
-    const data = await prisma.activeSites.findMany();
+    const data = (await prisma.activeSites.findMany())
+      .map(d => {
+        return {...d, id: d.id.toString()}
+      });
+
     data && console.log(`> [LOG] Endpoints pulled.`);
     data && data.forEach((x) => {
       console.log(JSON.stringify(x));

@@ -1,9 +1,10 @@
 import cron from "node-cron";
 import fs from "node:fs";
 import { Cronjob, DBCronjob } from "./modules/cronjob/types";
-import { sendAlertEmail } from "./modules/email";
-import { CRONJOB_SECRET, EMAIL_ADDRESS, MAIN_SCHEDULE } from "./config";
+import { EMAIL_ADDRESS, MAIN_SCHEDULE } from "./config";
 import { getActiveSites } from "./modules/activeSites/queries";
+import { generateTask } from "./modules/cronjob";
+import { sendAlertEmail } from "./modules/email";
 
 
 const installedCronjobs: Cronjob[] = [];
@@ -28,7 +29,7 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
   installedCronjobs.length > 0 && installedCronjobs.forEach((job: Cronjob, index: number) => {
  
     const id = `${job.id}`;
-    const details = JSON.stringify({id: job.id, endpoint: job.endpoint, recurrence: job.recurrence});   
+    const details = JSON.stringify({id: job.id, endpoint: job.endpoint, reocurrence: job.recurrence});   
     console.log(`${details}`);
 
     const inDB = supabase.find((x) => x.id === job.id);
@@ -55,6 +56,7 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
   console.log(`> [LOG] Checking each pulled ednpoint:`);
 
   let update = false;
+  
   supabase.forEach((data: DBCronjob, index: number) => {
 
     // validate data
@@ -64,47 +66,15 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
     const endpoint = `${data.website}/${data.apiEndpoint}`;
     const recurrence = data.recurrence;
    
-    if (!cron.validate(recurrence)) return console.log(`>>> ${recurrence} - is not a valid schedule expression. Skipping ..`);
+    if (!cron.validate(recurrence)) {
+      console.log(`> [ERROR] ${recurrence} - is not a valid schedule expression. Skipping ... Details:`)
+      sendAlertEmail(EMAIL_ADDRESS!, `invalid schedule expression from data pulled. Detals: endpoint -> ${endpoint}`, "logs.txt");
+      return;
+    };
 
     const installedCron = installedCronjobs.find((x) => x.id === id);
 
-    async function task() {
-
-      const logPath = `url-logs/${id}.txt`;
-
-      const secret = CRONJOB_SECRET;
-      if (!secret) return fs.appendFileSync(logPath,`> [ERROR] No secret was provided for authorization.\n`);
-
-
-      try {
-        const req = await fetch(endpoint, {
-          headers: {
-            "Authorization": `Bearer ${secret}`,
-          },
-          method: "POST"
-        });
-        const res = await req.json();
-
-        const text = `> [CRONJOB - ${id}] A request to ${endpoint} was made.
-            at: ${new Date()}
-            status: ${req.status}
-            body: ${JSON.stringify(res)}
-            cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n`;
-
-        fs.appendFileSync(logPath, text);
-        if (!req.ok) sendAlertEmail(EMAIL_ADDRESS!, text, logPath);
-
-      } catch (error) {
-
-        const text = `
-          > [CRONJOB ERROR] A request to ${endpoint} failed [${new Date()}]. Error details:
-            ${error}\n
-        `;
-        fs.appendFileSync(logPath, text);
-        sendAlertEmail(EMAIL_ADDRESS!, text, logPath);
-      }
-
-    }
+    const task = generateTask(endpoint, id, recurrence);
 
     if (!installedCron) {
       
