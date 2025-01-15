@@ -1,25 +1,30 @@
+NAME=active-sites
+SOURCE=ghcr.io/high-level-code/$(NAME)
+
 all:
+	tsx src/index.ts
 
 docker-build:
-	docker build -t url-cron .
+	docker build -t $(NAME) .
 
 docker-run:
-	docker run -d --name url-cron --env-file .env url-cron
+	docker run -d --name $(NAME) --env-file .env $(NAME)
 
-docker:
+# build and run
+br:
 	make docker-build && make docker-run
 
-docker-exec:
-	docker exec -it url-cron bash
+exe:
+	docker exec -it $(NAME) bash
 
 docker-clean:
-	docker stop url-cron && docker remove url-cron
+	docker stop $(NAME) && docker remove$(NAME)
 
 tag:
-	docker tag url-cron ghcr.io/high-level-code/url-cron
+	docker tag $(NAME)
 
 push:
-	docker push ghcr.io/high-level-code/url-cron
+	docker push $(SOURCE)
 
 tag-push:
 	make tag && make push

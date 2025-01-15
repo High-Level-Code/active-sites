@@ -2,11 +2,11 @@ import { ScheduledTask } from "node-cron";
 
 export interface DBCronjob {
   id: string,
-  website: string,
-  apiEndpoint: string,
-  recurrence: string,
   created_at: Date,
-};
+  website?: string | null,
+  apiEndpoint: string | null,
+  recurrence?: string | null,
+}
 
 export interface Cronjob {
   id: string,

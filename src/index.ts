@@ -1,8 +1,8 @@
 import cron from "node-cron";
 import fs from "node:fs";
 import { Cronjob, DBCronjob } from "./modules/cronjob/types";
-import { EMAIL_ADDRESS, MAIN_SCHEDULE } from "./config";
-import { getActiveSites } from "./modules/activeSites/queries";
+import { ENVIRONMENT, MAIN_SCHEDULE } from "./config";
+import { getActiveSites, getFakeData } from "./modules/activeSites/queries";
 import { generateTask } from "./modules/cronjob";
 import { sendAlertEmail } from "./modules/email";
 
@@ -18,10 +18,18 @@ if (!cron.validate(MAIN_SCHEDULE)) {
   process.exit(1);
 }
 
-cron.schedule(`${MAIN_SCHEDULE}`, async () => {
+const schedule = ENVIRONMENT.startsWith("prod") ?
+  MAIN_SCHEDULE : "*/1 * * * *";
+
+cron.schedule(schedule, async () => await main());
+console.log(`> [LOG] Main cronjob installed successfully - at ${new Date()}\n`);
+
+async function main() {
   console.log(">> Executing main cronjob ..");
   console.log(`> [LOG] Pulling endpoints from database ...`);
-  const supabase = await getActiveSites() || [];
+  const supabase = ENVIRONMENT.startsWith("prod") ?
+    await getActiveSites() :
+    getFakeData();
 
   // remove not listed cronjobs in the database
   console.log(`> [LOG] Checking already insalled cronjobs:`);
@@ -34,7 +42,6 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
 
     const inDB = supabase.find((x) => x.id === job.id);
     if (inDB) return;
-
 
     job.cronTask!.stop();
     job.cronTask = null;
@@ -63,12 +70,12 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
     console.log(`>>> index ${index}`);
     console.log(`--> Data: `, data);
     const id = data.id;
-    const endpoint = `${data.website}/${data.apiEndpoint}`;
-    const recurrence = data.recurrence;
+    const endpoint = `${data.website!}/${data.apiEndpoint!}`;
+    const recurrence = data.recurrence!;
    
     if (!cron.validate(recurrence)) {
       console.log(`> [ERROR] ${recurrence} - is not a valid schedule expression. Skipping ... Details:`)
-      sendAlertEmail(EMAIL_ADDRESS!, `invalid schedule expression from data pulled. Detals: endpoint -> ${endpoint}`, "logs.txt");
+      sendAlertEmail(`invalid schedule expression from data pulled. Detals: endpoint -> ${endpoint}`, "logs.txt");
       return;
     };
 
@@ -82,15 +89,17 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
         id,
         endpoint,
         recurrence,
-        cronTask: cron.schedule(data.recurrence, task)
+        cronTask: cron.schedule(recurrence, task)
       });
       
       console.log(`--> Endpoint successfully installed as a cronjob - at ${new Date()} - Details:`);
       console.log(`     id: ${id}`);
       console.log(`     endpoint: ${endpoint}`);
       console.log(`     recurrence: ${recurrence}`);
-
-      fs.appendFileSync(`url-logs/${id}.txt`, `File created at ${new Date()}\n`);
+      
+      const logFolder = "url-logs"
+      if (!fs.existsSync(logFolder)) fs.mkdirSync(logFolder, { recursive: true });
+      fs.appendFileSync(`${logFolder}/${id}.txt`, `File created at ${new Date()}\n`);
       return;
     }
 
@@ -121,7 +130,7 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
       delete installedCron.cronTask;
 
       installedCron.endpoint = `${data.website}/${data.apiEndpoint}`;
-      installedCron["cronTask"] = cron.schedule(data.recurrence, task);
+      installedCron["cronTask"] = cron.schedule(recurrence, task);
       update = true;
       return;
     }
@@ -136,9 +145,9 @@ cron.schedule(`${MAIN_SCHEDULE}`, async () => {
     if (!job) return console.log("no cronjob");
     console.log(JSON.stringify({id: job.id, endpoint: job.endpoint, recurrence: job.recurrence}));
   });
+
   console.log("\n");
   console.log(">> End of main cronjob execution");
   console.log("\n");
-});
+}
 
-console.log(`> [LOG] Main cronjob installed successfully - at ${new Date()}\n`);
