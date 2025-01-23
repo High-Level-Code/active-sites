@@ -6,7 +6,6 @@ import { getActiveSites, getFakeData } from "./modules/activeSites/queries";
 import { generateTask } from "./modules/cronjob";
 import { sendAlertEmail } from "./modules/email";
 
-
 const installedCronjobs: Cronjob[] = [];
 
 if (!MAIN_SCHEDULE) {

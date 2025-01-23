@@ -21,7 +21,7 @@ docker-clean:
 	docker stop $(NAME) && docker remove$(NAME)
 
 tag:
-	docker tag $(NAME)
+	docker tag $(NAME) $(SOURCE)
 
 push:
 	docker push $(SOURCE)

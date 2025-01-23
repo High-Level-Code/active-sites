@@ -45,15 +45,15 @@ export function getFakeData() {
     {
       id: "1",
       created_at: new Date(),
-      website: "https://fakewebsite.com",
-      apiEndpoint: "api/fake_endpoint",
+      website: "https://www.davidsgarage.pro",
+      apiEndpoint: "api/supabase_cron_job",
       recurrence: "*/2 * * * *",
     },
     {
       id: "2",
       created_at: new Date(),
-      website: "https://fakewebsite2.com",
-      apiEndpoint: "api/fake_endpoint",
+      website: "https://www.michaelmartell.com",
+      apiEndpoint: "api/supabase_cron_job",
       recurrence: "*/2 * * * *",
     },
   ] as DBCronjob[]

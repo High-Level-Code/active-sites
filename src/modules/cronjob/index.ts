@@ -18,8 +18,11 @@ export function generateTask(endpoint: string, id: string, recurrence: string) {
         method: "POST"
       });
 
+      const reqText = await req.text();
+      const reqBody = reqText ? JSON.parse(JSON.stringify(reqText)) : undefined;
+
       if (!req.ok) {
-        const body = await req.text() ? JSON.stringify(await req.json()) : "no body returned";
+        const body = reqBody ? reqBody : "no body returned";
         const error = `> [Error] Request failed (${new Date()}). Details:
           status: ${req.status}
           body: ${body}\n
@@ -29,13 +32,12 @@ export function generateTask(endpoint: string, id: string, recurrence: string) {
         sendAlertEmail(error, logPath);
         return;
       }
-
-      const res = await req.text() ? await req.json() : undefined;
-
+      
+      const body = reqBody ? reqBody : "no body returned";
       const text = `> [Cron-${id}] Request successfully sent to ${endpoint}.Details:
           at: ${new Date()}
           status: ${req.status}
-          body: ${ res ? JSON.stringify(res) : "No body returned"}
+          body: ${body}
           cronjob details: ${JSON.stringify({id, endpoint, recurrence})}\n
       `;
 
